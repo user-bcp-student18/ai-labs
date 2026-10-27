@@ -36,6 +36,7 @@ describe('DashboardComponent', () => {
   let storage: MemoryStorage;
   let navigate: ReturnType<typeof vi.fn>;
   let component: DashboardComponent;
+  let session: SessionService;
 
   beforeEach(() => {
     storage = new MemoryStorage();
@@ -43,11 +44,12 @@ describe('DashboardComponent', () => {
     navigate = vi.fn().mockResolvedValue(true);
     vi.mocked(axios.get).mockReset();
     vi.mocked(axios.post).mockReset();
+    session = new SessionService();
     component = new DashboardComponent(
       { navigate } as unknown as Router,
       { detectChanges: vi.fn() } as unknown as ChangeDetectorRef,
       { run: (callback: () => void) => callback() } as unknown as NgZone,
-      new SessionService(),
+      session,
       new TasksService()
     );
   });
@@ -60,8 +62,7 @@ describe('DashboardComponent', () => {
   });
 
   it('loads tasks with the stored owner and bearer token, filters and sorts them', async () => {
-    storage.setItem('workshop_token', 'test-token');
-    storage.setItem('workshop_user', JSON.stringify({ username: 'student' }));
+    session.saveSession('test-token', { username: 'student' }, { theme: 'light', showTips: true, compact: false });
     vi.mocked(axios.get).mockResolvedValue({
       data: [
         { title: 'Low', status: 'TODO', priority: 'low', owner: 'student' },
@@ -83,7 +84,7 @@ describe('DashboardComponent', () => {
     expect(component.error).toBe('');
   });
 
-  it('logs in and loads tasks using the persisted session', async () => {
+  it('logs in and loads tasks using the in-memory session without persisting the token', async () => {
     vi.mocked(axios.post).mockResolvedValue({
       data: { token: 'test-token', user: { username: 'student' } }
     });
@@ -91,7 +92,7 @@ describe('DashboardComponent', () => {
     const loginComponent = new LoginComponent(
       { navigate: loginNavigate } as unknown as Router,
       new AuthService(),
-      new SessionService()
+      session
     );
     loginComponent.username = 'student';
     loginComponent.password = 'Workshop123!';
@@ -102,7 +103,8 @@ describe('DashboardComponent', () => {
     await loginComponent.login();
     await component.ngOnInit();
 
-    expect(storage.getItem('workshop_token')).toBe('test-token');
+    expect(storage.getItem('workshop_token')).toBeNull();
+    expect(session.getToken()).toBe('test-token');
     expect(loginNavigate).toHaveBeenCalledWith(['/dashboard']);
     expect(axios.get).toHaveBeenCalledWith(
       'http://localhost:8000/api/tasks',
@@ -113,8 +115,7 @@ describe('DashboardComponent', () => {
   });
 
   it('shows a load error and clears loading when the request fails', async () => {
-    storage.setItem('workshop_token', 'test-token');
-    storage.setItem('workshop_user', JSON.stringify({ username: 'student' }));
+    session.saveSession('test-token', { username: 'student' }, { theme: 'light', showTips: true, compact: false });
     vi.mocked(axios.get).mockRejectedValue({ message: 'network unavailable' });
 
     await component.ngOnInit();
@@ -124,8 +125,7 @@ describe('DashboardComponent', () => {
   });
 
   it('uses the backend task detail when the task request fails', async () => {
-    storage.setItem('workshop_token', 'test-token');
-    storage.setItem('workshop_user', JSON.stringify({ username: 'student' }));
+    session.saveSession('test-token', { username: 'student' }, { theme: 'light', showTips: true, compact: false });
     vi.mocked(axios.get).mockRejectedValue({
       response: { data: { detail: 'Access denied' } }
     });
@@ -136,8 +136,7 @@ describe('DashboardComponent', () => {
   });
 
   it('shows an invalid-token response without clearing the session or redirecting', async () => {
-    storage.setItem('workshop_token', 'invalid-token');
-    storage.setItem('workshop_user', JSON.stringify({ username: 'student' }));
+    session.saveSession('invalid-token', { username: 'student' }, { theme: 'light', showTips: true, compact: false });
     vi.mocked(axios.get).mockRejectedValue({
       response: { status: 401, data: { detail: 'Invalid token' } }
     });
@@ -146,13 +145,12 @@ describe('DashboardComponent', () => {
 
     expect(component.error).toBe('Invalid token');
     expect(component.loading).toBe(false);
-    expect(storage.getItem('workshop_token')).toBe('invalid-token');
+    expect(session.getToken()).toBe('invalid-token');
     expect(navigate).not.toHaveBeenCalled();
   });
 
   it('shows a task request timeout message and clears loading', async () => {
-    storage.setItem('workshop_token', 'test-token');
-    storage.setItem('workshop_user', JSON.stringify({ username: 'student' }));
+    session.saveSession('test-token', { username: 'student' }, { theme: 'light', showTips: true, compact: false });
     vi.mocked(axios.get).mockRejectedValue({
       code: 'ECONNABORTED',
       message: 'timeout of 5000ms exceeded'
@@ -165,7 +163,7 @@ describe('DashboardComponent', () => {
   });
 
   it('uses a generic message for an unstructured task error', async () => {
-    storage.setItem('workshop_token', 'test-token');
+    session.saveSession('test-token', { username: 'student' }, { theme: 'light', showTips: true, compact: false });
     vi.mocked(axios.get).mockRejectedValue(null);
 
     await component.ngOnInit();
@@ -173,16 +171,15 @@ describe('DashboardComponent', () => {
     expect(component.error).toBe('No se pudo cargar el dashboard');
   });
 
-  it('clears the stored token and user on logout but retains preferences', async () => {
-    storage.setItem('workshop_token', 'test-token');
-    storage.setItem('workshop_user', JSON.stringify({ username: 'student' }));
-    storage.setItem('workshop_preferences', JSON.stringify({ theme: 'dark' }));
+  it('clears the in-memory token and stored user on logout but retains preferences', async () => {
+    session.saveSession('test-token', { username: 'student' }, { theme: 'dark', showTips: true, compact: false });
 
     await component.logout();
 
-    expect(storage.getItem('workshop_token')).toBeNull();
+    expect(session.getToken()).toBeNull();
     expect(storage.getItem('workshop_user')).toBeNull();
-    expect(storage.getItem('workshop_preferences')).toBe('{"theme":"dark"}');
+    expect(storage.getItem('workshop_token')).toBeNull();
+    expect(JSON.parse(storage.getItem('workshop_preferences') ?? '{}')).toMatchObject({ theme: 'dark' });
     expect(navigate).toHaveBeenCalledWith(['/login']);
   });
 
