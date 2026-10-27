@@ -47,7 +47,7 @@ describe('LoginComponent', () => {
     component.password = 'Workshop123!';
   });
 
-  it('posts credentials, keeps the token out of localStorage and navigates', async () => {
+  it('posts credentials and persists the returned session before navigating', async () => {
     vi.mocked(axios.post).mockResolvedValue({
       data: { token: 'test-token', user: { username: 'student' } }
     });
@@ -59,7 +59,7 @@ describe('LoginComponent', () => {
       { username: 'student', password: 'Workshop123!', client: 'angular-workshop' },
       { timeout: 5000 }
     );
-    expect(storage.getItem('workshop_token')).toBeNull();
+    expect(storage.getItem('workshop_token')).toBe('test-token');
     expect(JSON.parse(storage.getItem('workshop_user') ?? '{}')).toEqual({ username: 'student' });
     expect(navigate).toHaveBeenCalledWith(['/dashboard']);
     expect(component.busy).toBe(false);

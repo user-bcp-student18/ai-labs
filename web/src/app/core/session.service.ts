@@ -10,15 +10,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 
 @Injectable({ providedIn: 'root' })
 export class SessionService {
-  private token: string | null = null;
-
-  constructor() {
-    // Elimina tokens persistidos por versiones anteriores.
-    localStorage.removeItem(SESSION_STORAGE_KEYS.token);
-  }
-
   getToken(): string | null {
-    return this.token;
+    return localStorage.getItem(SESSION_STORAGE_KEYS.token);
   }
 
   getUser(): AuthUser {
@@ -70,13 +63,13 @@ export class SessionService {
   }
 
   saveSession(token: string, user: AuthUser, preferences: UserPreferences): void {
-    this.token = token;
+    localStorage.setItem(SESSION_STORAGE_KEYS.token, token);
     localStorage.setItem(SESSION_STORAGE_KEYS.user, JSON.stringify(user));
     localStorage.setItem(SESSION_STORAGE_KEYS.preferences, JSON.stringify(preferences));
   }
 
   clearSession(): void {
-    this.token = null;
+    localStorage.removeItem(SESSION_STORAGE_KEYS.token);
     localStorage.removeItem(SESSION_STORAGE_KEYS.user);
   }
 }

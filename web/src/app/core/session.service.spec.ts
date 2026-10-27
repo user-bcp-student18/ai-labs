@@ -126,28 +126,6 @@ describe('SessionService', () => {
       compact: false
     });
   });
-
-  it('keeps the token out of localStorage and out of a new session instance', () => {
-    storage = setStorage();
-    const session = new SessionService();
-
-    session.saveSession('test-token', { username: 'student' }, {
-      theme: 'light',
-      showTips: true,
-      compact: false
-    });
-
-    expect(storage.getItem(SESSION_STORAGE_KEYS.token)).toBeNull();
-    expect(new SessionService().getToken()).toBeNull();
-  });
-
-  it('removes a token persisted by a previous version', () => {
-    storage = setStorage();
-    storage.setItem(SESSION_STORAGE_KEYS.token, 'legacy-token');
-
-    expect(new SessionService().getToken()).toBeNull();
-    expect(storage.getItem(SESSION_STORAGE_KEYS.token)).toBeNull();
-  });
 });
 
 function setStorage(): MemoryStorage {
