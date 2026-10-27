@@ -1,7 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, NgZone, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import axios from 'axios';
+import { AuthUser } from '../core/auth.models';
+import { SessionService } from '../core/session.service';
+import { TasksService } from '../core/tasks.service';
+import { Task } from '../core/task.models';
 import { formatTaskLabel } from '../utils/legacy-format';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -20,51 +23,51 @@ const STATUS_LABELS: Record<string, string> = {
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit {
-  tasks: any[] = [];
-  visibleTasks: any[] = [];
-  user: any = {};
-  loading: any = true;
-  error: any = '';
+  tasks: Task[] = [];
+  visibleTasks: Task[] = [];
+  user: AuthUser = {};
+  loading = true;
+  error = '';
 
-  constructor(private router: Router, private cdr: ChangeDetectorRef, private zone: NgZone) {}
+  constructor(
+    private readonly router: Router,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly zone: NgZone,
+    private readonly sessionService: SessionService,
+    private readonly tasksService: TasksService
+  ) {}
 
   statusLabel(status: string): string {
-    return STATUS_LABELS[(status || '').toUpperCase()] || status;
+    return STATUS_LABELS[status.toUpperCase()] ?? status;
   }
 
   async ngOnInit(): Promise<void> {
-    const token = localStorage.getItem('workshop_token');
-    this.user = JSON.parse(localStorage.getItem('workshop_user') || '{}');
+    const token = this.sessionService.getToken();
+    this.user = this.sessionService.getUser();
     if (!token) {
       await this.router.navigate(['/login']);
       return;
     }
+
     try {
-      const response: any = await axios.get('http://localhost:8000/api/tasks?owner=' + (this.user.username || ''), {
-        headers: { Authorization: 'Bearer ' + token }
-      });
-      const tasks = response.data;
-      const tmp: any[] = [];
-      for (let i = 0; i < tasks.length; i++) {
-        if (tasks[i].status !== 'ARCHIVED') {
-          tasks[i].label = formatTaskLabel(tasks[i]);
-          tmp.push(tasks[i]);
-        }
-      }
-      tmp.sort((a: any, b: any) => a.priority > b.priority ? -1 : 1);
-      // axios resuelve a veces fuera de la zona de Angular (más aún llegando
-      // por navegación desde el login): forzamos volver a entrar a la zona
-      // y disparamos detectChanges a mano para no depender de que Angular
-      // lo detecte solo.
+      const tasks = await this.tasksService.getTasks(
+        'username' in this.user && typeof this.user.username === 'string' ? this.user.username : '',
+        token
+      );
+      const visibleTasks = tasks
+        .filter((task) => task.status !== 'ARCHIVED')
+        .map((task) => ({ ...task, label: formatTaskLabel(task) }))
+        .sort((left, right) => (right.priority ?? '').localeCompare(left.priority ?? ''));
+
       this.zone.run(() => {
         this.tasks = tasks;
-        this.visibleTasks = tmp;
+        this.visibleTasks = visibleTasks;
         this.loading = false;
         this.cdr.detectChanges();
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.zone.run(() => {
-        this.error = error?.response?.data?.detail || error?.message || 'No se pudo cargar el dashboard';
+        this.error = readTaskErrorMessage(error);
         this.loading = false;
         this.cdr.detectChanges();
       });
@@ -72,8 +75,23 @@ export class DashboardComponent implements OnInit {
   }
 
   async logout(): Promise<void> {
-    localStorage.removeItem('workshop_token');
-    localStorage.removeItem('workshop_user');
+    this.sessionService.clearSession();
     await this.router.navigate(['/login']);
   }
+}
+
+function readTaskErrorMessage(error: unknown): string {
+  if (!isRecord(error)) {
+    return 'No se pudo cargar el dashboard';
+  }
+
+  const response = error.response;
+  if (isRecord(response) && isRecord(response.data) && typeof response.data.detail === 'string') {
+    return response.data.detail;
+  }
+  return typeof error.message === 'string' ? error.message : 'No se pudo cargar el dashboard';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
