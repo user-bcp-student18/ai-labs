@@ -1,0 +1,12 @@
+Prompt para ejecutar el skill: 
+
+Usa el skill revision-pr-autorizacion (definido en docs/revision-pr-automatizacion/skill.md) para revisar localmente el siguiente pull request.
+
+PR: https://github.com/user-bcp-student18/ai-labs/pull/22
+Ruta del informe (opcional): <ruta, por ejemplo revision-pr-<numero>.md; si se omite, usa la ruta por defecto en la raíz del workspace>
+
+Antes de analizar, verifica los criterios de entrada: URL presente, herramientas MCP disponibles y alcance limitado a autorización de acceso a recursos.
+
+Obtén mediante MCP la URL, el repositorio, el número y los SHA completos de base y cabeza, y el diff completo con todas sus páginas. No uses el checkout local como sustituto.
+
+Al terminar, escribe el informe con el formato del skill y verifica los criterios de salida. No publiques comentarios, revisiones ni aprobaciones en el PR. Al final, resume en el chat: número de observaciones por tipo (defecto demostrado o riesgo por confirmar), estado de las pruebas (ejecutadas o pendientes) y las limitaciones declaradas.
