@@ -7,12 +7,19 @@ argument-hint: 'URL del PR y, opcionalmente, ruta para guardar la revision local
 
 ## Alcance y criterio
 
-Revisa exclusivamente la autorizacion de acceso a recursos: los cambios no deben permitir que un actor acceda o modifique un recurso sin la comprobacion de permisos, propiedad o aislamiento entre tenants que corresponda. Considera tambien eliminaciones o cambios en controles existentes. No revises otros aspectos de seguridad, pruebas en general ni compatibilidad. No supongas que una comprobacion falta sin verificar el contexto necesario.
+los cambios no deben permitir que un actor acceda o modifique un recurso sin la comprobacion de permisos, propiedad o aislamiento entre tenants que corresponda. Considera tambien eliminaciones o cambios en controles existentes. No revises otros aspectos de seguridad, pruebas en general ni compatibilidad. No supongas que una comprobacion falta sin verificar el contexto necesario.
+
+Incluye en la revision lo de Clean Code, asegurando que el codigo sea legible, mantenible y siga buenas practicas de estructura y nomenclatura. Esto implica revisar la claridad de los nombres de variables y funciones, la organizacion del codigo, la consistencia en el estilo y la ausencia de codigo duplicado o innecesario. Ademas, verifica que los cambios no introduzcan complejidad innecesaria y que el flujo del codigo sea facil de seguir. Registra cualquier observacion relacionada con la legibilidad, mantenibilidad o adherencia a buenas practicas de Clean Code junto con las observaciones de autorizacion.
+
+incluye en los Test el l patrón AAA (Arrange-Act-Assert u Organizar, Actuar y Afirmar) es un estándar en la industria para estructurar pruebas unitarias y de software de forma clara y mantenible y asegúrate de que cada prueba siga esta estructura para mejorar la legibilidad y la comprensión del flujo de la prueba. Registra cualquier observación relacionada con la adherencia al patrón AAA junto con las observaciones de autorizacion y Clean Code.
 
 ## Entrada
 
 - URL del PR. Si falta, solicitala antes de continuar.
-- Ruta opcional para el informe local. Por defecto usa `revision-pr-<numero>.md` en la raiz del workspace. Si ya existe, no lo sobrescribas: solicita otra ruta o usa un nombre disponible.
+
+## Salida
+
+Ruta opcional para el informe local. Por defecto usa `revision-pr-<numero>.md` en la raiz del workspace. Si ya existe, no lo sobrescribas: solicita otra ruta o usa un nombre disponible.
 
 ## Procedimiento
 
