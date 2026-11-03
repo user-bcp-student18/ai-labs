@@ -250,13 +250,14 @@ curl -X POST http://localhost:8000/api/requirements \
 {"owner": "student", "fileName": "requisitos.txt", "storedAt": "C:\\Users\\Usuario\\AppData\\Local\\Temp\\tmprgji0c77\\up\\requisitos.txt", "size": 27}
 ```
 
-(`storedAt` es un ejemplo de una ejecución local en Windows; en otro entorno la ruta es distinta.) Si se sube otro archivo con el mismo nombre, se sobrescribe.
+(`storedAt` es un ejemplo de una ejecución local en Windows; en otro entorno la ruta es distinta.) Si ya existe un archivo con el mismo nombre (de cualquier usuario), la subida se rechaza con 409 y el archivo existente no se modifica.
 
 **5. Errores**
 
 | Código | Cuándo                                                                                  | Cuerpo de ejemplo                                                                                      |
 | ------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | 401     | Token ausente o inválido.                                                               | `{"detail": "Invalid token"}`                                                                        |
+| 409     | Ya existe un archivo con ese nombre en el directorio de cargas.                         | `{"detail": "File already exists"}`                                                                  |
 | 422     | Falta el campo `file`.                                                                 | `{"detail": [{"type": "missing", "loc": ["body", "file"], "msg": "Field required", "input": null}]}` |
 | 500     | El nombre de archivo incluye un subdirectorio que no existe (por ejemplo `sub/x.txt`). | `Internal Server Error`                                                                              |
 
@@ -264,7 +265,7 @@ curl -X POST http://localhost:8000/api/requirements \
 
 - **El nombre del archivo no se normaliza** y no hay límite de extensión ni de tamaño; el archivo se lee completo en memoria (hallazgo H-API-04, pendiente). No suba nombres con rutas y no asuma que el servidor valida el tipo de archivo.
 - `storedAt` expone la ruta absoluta del servidor (parte del contrato actual; se resuelve con H-API-04).
-- Un archivo del mismo nombre se sobrescribe sin aviso, también entre usuarios distintos.
+- Un archivo del mismo nombre ya no se sobrescribe (409, H-API-15). Un archivo parcial por un fallo de escritura se elimina para no bloquear reintentos. Subir otra versión exige otro nombre.
 
 ---
 
@@ -333,6 +334,7 @@ Cambios aprobados por el usuario en `PLAN.md` (registrados con su cita) y verifi
 | H-API-08 | CORS limitado a los orígenes de `WORKSHOP_CORS_ORIGINS` (antes cualquier origen), métodos `GET`/`POST`.                                                                                                    |
 | H-API-09 | El 401 antes devolvía `"Invalid token: <detalle>"`; ahora `"Invalid token"`. Con el servicio de autenticación caído, `body` antes traía el texto de la excepción; ahora `"Auth service unavailable"`. |
 | H-API-10 | `POST /api/tasks` antes aceptaba cualquier valor (título vacío, estados o prioridades arbitrarios, números convertidos a texto); ahora responde 422 en esos casos.                                            |
+| H-API-15 | `POST /api/requirements` antes sobrescribía un archivo existente con el mismo nombre (también de otro usuario); ahora responde 409 `{"detail": "File already exists"}` y no modifica el archivo existente. |
 
 Sin cambios: rutas, métodos, códigos 200/201/401, nombres de los campos de las respuestas.
 

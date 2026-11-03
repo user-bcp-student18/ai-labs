@@ -169,3 +169,19 @@ Cobertura del código modificado: numerador 269, denominador 269 (sentencias de 
 - **H-API-10:** los máximos `title` 200 y `description` 2000 son valores propuestos por mí (el plan decía "máximo acotado"); `owner` conserva su comportamiento y un `null` explícito en un campo opcional pasa a 422.
 - **Sin cambios de SQL:** la concatenación se movió tal cual a `repository.py` (H-API-03 fuera del alcance aprobado).
 - **Fuera de `api/`:** no se tocó `compose.yaml` ni `tools/`; `app.main:app` sigue existiendo.
+
+### H-API-15 — Archivos subidos sobrescribibles por cualquier usuario autenticado (Vulnerabilidad, media)
+
+Estado: implementado en la rama local `day1/prompting`; revisión humana pendiente. No hay Issue en GitHub (el hallazgo se identifica por su ID).
+
+**Decisiones registradas (2026-11-03, respuestas del usuario a la solicitud de decisiones previa a implementar):** política "A - rechazar si ya existe (recomendada)"; respuesta en colisión "409 con detail genérico \"File already exists\""; "Sí, lo confirmo" a que `web` no consume `storedAt`/`fileName` (no verificado por el agente: una búsqueda de solo lectura en `web/src` no encontró referencias); entrega "rama local day1/prompting + commits + texto del PR en un archivo local, sin push ni PR remoto". Preguntas abiertas 5 (orden frente a H-API-04) y 6 (archivos ya existentes en volúmenes) de la revisión de arquitectura no se respondieron.
+
+**Cambio:** `RequirementService.store` crea el archivo en modo exclusivo (`"xb"`) y lanza `FileAlreadyExistsError` si existe; la ruta lo traduce a 409 `{"detail": "File already exists"}`. Si la escritura falla tras crear el archivo, se elimina el parcial (solo cuando lo creó esta petición).
+
+**Contrato:** nuevo 409 en `POST /api/requirements` (documentado en `docs/ENDPOINTS.md`). Sin cambios en claves ni en `storedAt` de una subida nueva. Cambio de comportamiento para el mismo usuario: ya no puede reemplazar su propio archivo.
+
+**Fuera de alcance (sin cambios):** H-API-04 (`../`, subdirectorios, extensión, tamaño; sus 2 pruebas siguen `xfail`), H-API-01, 02, 03, `storedAt` con ruta del servidor.
+
+**Ejecuciones (cwd raíz o `api/`, Python 3.13.15, `api/.venv`):** ver `docs/TESTING.md`, ejecuciones 6 a 8 (baseline 134 passed + 6 xfailed; tras el cambio 138 passed + 6 xfailed; cobertura 100% con 284 sentencias).
+
+**Reversión:** `git revert` de los commits de H-API-15 (sin migraciones). Los archivos ya subidos no se alteran.

@@ -146,7 +146,7 @@ Los comportamientos de H-API-14, H-API-15 y H-API-16 se comprobaron con un scrip
 - Cómo validarlo: prueba de caracterización con `TestClient` (BD temporal): `POST` con `owner=""`, luego `GET ?owner=` y `GET` sin parámetro; esperar 422 o asignación al usuario del token según lo que se acuerde. `python tools/lab.py test api` para el resto de la suite.
 
 ### H-API-15 — Archivos subidos en un directorio plano compartido y sobrescribibles por cualquier usuario autenticado
-- Estado: CANDIDATO
+- Estado: IMPLEMENTADO — pendiente de revisión humana (rama local `day1/prompting`; ver `PLAN.md`, sección "H-API-15", y `docs/TESTING.md`, ejecuciones 6 a 8). Antes: CANDIDATO.
 - Evidencia: `RequirementService.store` calcula `self._upload_dir / str(filename)` y llama `write_bytes` (`api/app/services.py:57-58`) sin separar por usuario ni impedir que el archivo ya exista; la ruta (`api/app/routes/requirements.py:17-19`) devuelve 201 y `storedAt` con la ruta del servidor. Comprobado localmente: `alice` sube `req.txt` y `bob` sube otro `req.txt`; ambos reciben 201 y el contenido final es el de `bob`. Relacionado con H-API-04 (nombre/tamaño/extensión) pero distinto: ocurre con un nombre legítimo y dentro del directorio de cargas.
 - Impacto: pérdida o sustitución silenciosa de archivos de otro usuario; `owner` de la respuesta no está ligado a lo almacenado. Una validación de nombre (H-API-04) no lo corrige por sí sola.
 - Prioridad propuesta: Media

@@ -12,7 +12,7 @@ Fuente de las expectativas: la sección api de [docs/ENDPOINTS.md](./ENDPOINTS.m
 
 | Archivo | Contenido | Pruebas |
 |---|---|---|
-| [api/tests/test_endpoints.py](../api/tests/test_endpoints.py) | Camino feliz, casos borde y errores por endpoint según `docs/ENDPOINTS.md` (este paso). | 97 (91 pasan, 6 `xfail`) |
+| [api/tests/test_endpoints.py](../api/tests/test_endpoints.py) | Camino feliz, casos borde y errores por endpoint según `docs/ENDPOINTS.md` (este paso). | 101 (95 pasan, 6 `xfail`) |
 | `api/tests/test_api.py`, `test_characterization.py`, `test_corrections.py` | Pruebas originales, de caracterización (antes del refactor) y de corrección de H-API-05 a H-API-11. | 43 (todas pasan) |
 
 ### Tabla de pruebas por endpoint
@@ -76,7 +76,11 @@ Todas son de `api/tests/test_endpoints.py`. "Resultado" indica lo ejecutado: **p
 | Archivo vacío | Borde | 201 con `size` 0 y archivo vacío | pasa |
 | Archivo sin extensión (`LEEME`) | Borde | 201 y se conserva el nombre | pasa |
 | Archivo de 1 MiB | Borde | 201 con `size` 1 048 576 | pasa |
-| Mismo nombre dos veces | Borde | El segundo sobrescribe al primero | pasa |
+| Mismo nombre dos veces (mismo usuario) | Borde | 409 `{"detail": "File already exists"}` sin filtrar la ruta; el primer archivo queda intacto | pasa |
+| Mismo nombre de otro usuario (H-API-15) | Seguridad | 409; el archivo del primer usuario queda intacto | pasa |
+| Token inválido sin archivo escrito | Error | 401 y el directorio de cargas queda vacío | pasa |
+| Subidas concurrentes del mismo nombre (servicio, 8 hilos) | Borde | Exactamente una tiene éxito y 7 se rechazan | pasa |
+| Fallo de escritura simulado (servicio) | Error | No queda archivo parcial y un reintento posterior funciona | pasa |
 | Sin campo `file` | Error | 422 con `loc: ["body", "file"]`, `type: missing` | pasa |
 | Token inválido / falla interna | Error | 401 / 500 genérico | pasa |
 | Nombre con `../` | Seguridad | No debe escribirse fuera de `uploads/` | **xfail** (H-API-04) |
@@ -178,6 +182,9 @@ Todas con Python 3.13.15 y `api/.venv`. Las ejecuciones de este paso:
 | 3 | todos los endpoints, H-API-05 a H-API-11 | `python tools/lab.py test api` (ejecuta `python -m pytest --cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=85`) | raíz | 0 | 134 passed, 6 xfailed; umbral 85% alcanzado; informe HTML en `api/htmlcov/index.html` |
 | 4 | todos | `python -m pytest tests/test_endpoints.py --cov=app --cov-branch -p no:cacheprovider -W ignore -q --cov-report=term-missing` | `api/` | 0 | cobertura 100% (269/269 sentencias, 10/10 ramas) usando solo el archivo nuevo |
 | 5 | todos | `python -m pytest tests -p no:cacheprovider -W ignore` | `api/` | 0 | 134 passed, 6 xfailed |
+| 6 | H-API-15 (línea base, antes del cambio) | `python tools/lab.py test api` | raíz | 0 | 134 passed, 6 xfailed; cobertura 100% (269 sentencias) |
+| 7 | H-API-15 (prueba de caracterización) | `python -m pytest tests/test_endpoints.py -k upload -p no:cacheprovider --no-cov` | `api/` | 0 | 6 passed, 3 xfailed (los 2 de H-API-04 y el nuevo de H-API-15, que describe el defecto contra el código antiguo) |
+| 8 | H-API-15 (tras el cambio) | `python tools/lab.py test api` | raíz | 0 | 138 passed, 6 xfailed; cobertura 100% (284 sentencias, 0 sin cubrir); umbral 85% alcanzado |
 
 El resumen detallado de las ejecuciones anteriores (línea base, caracterización, corrección) está en `PLAN.md`, sección "Registro de ejecuciones".
 
