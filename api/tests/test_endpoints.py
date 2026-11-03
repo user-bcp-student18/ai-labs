@@ -30,6 +30,7 @@ INTERNAL_DETAIL = "detalle-interno-que-no-debe-salir"
 IDOR_BUG = pytest.mark.xfail(strict=True, reason="H-API-02: la autorización no depende de la identidad del token")
 SQL_BUG = pytest.mark.xfail(strict=True, reason="H-API-03: SQL concatenado; una comilla simple provoca 500")
 FILE_BUG = pytest.mark.xfail(strict=True, reason="H-API-04: el nombre del archivo no se normaliza")
+OVERWRITE_BUG = pytest.mark.xfail(strict=True, reason="H-API-15: una subida sobrescribe el archivo de otro usuario")
 
 
 def raw_token(fields: str) -> str:
@@ -356,6 +357,16 @@ def test_upload_same_name_overwrites_previous_file(client, tmp_path) -> None:
     client.post("/api/requirements", headers=auth_headers(), files={"file": ("a.txt", b"primero", "text/plain")})
     client.post("/api/requirements", headers=auth_headers(), files={"file": ("a.txt", b"segundo!", "text/plain")})
     assert (tmp_path / "uploads" / "a.txt").read_bytes() == b"segundo!"
+
+
+@OVERWRITE_BUG
+def test_upload_does_not_overwrite_file_of_another_user(client, tmp_path) -> None:
+    client.post("/api/requirements", headers=auth_headers("alice"), files={"file": ("req.txt", b"de alice", "text/plain")})
+    response = client.post(
+        "/api/requirements", headers=auth_headers("bob"), files={"file": ("req.txt", b"de bob", "text/plain")}
+    )
+    assert (tmp_path / "uploads" / "req.txt").read_bytes() == b"de alice"
+    assert response.status_code != 201
 
 
 def test_upload_without_file_field_returns_422(client) -> None:
