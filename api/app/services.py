@@ -48,6 +48,10 @@ class TaskService:
         )
 
 
+class FileAlreadyExistsError(Exception):
+    """Ya existe un archivo con ese nombre en el directorio de cargas (H-API-15)."""
+
+
 class RequirementService:
     def __init__(self, upload_dir: str) -> None:
         self._upload_dir = Path(upload_dir)
@@ -55,7 +59,16 @@ class RequirementService:
 
     def store(self, filename: str | None, content: bytes) -> Path:
         target = self._upload_dir / str(filename)
-        target.write_bytes(content)
+        try:
+            stored_file = target.open("xb")
+        except FileExistsError as error:
+            raise FileAlreadyExistsError(filename) from error
+        try:
+            with stored_file:
+                stored_file.write(content)
+        except OSError:
+            target.unlink(missing_ok=True)
+            raise
         return target
 
 

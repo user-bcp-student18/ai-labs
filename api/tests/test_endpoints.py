@@ -30,7 +30,6 @@ INTERNAL_DETAIL = "detalle-interno-que-no-debe-salir"
 IDOR_BUG = pytest.mark.xfail(strict=True, reason="H-API-02: la autorización no depende de la identidad del token")
 SQL_BUG = pytest.mark.xfail(strict=True, reason="H-API-03: SQL concatenado; una comilla simple provoca 500")
 FILE_BUG = pytest.mark.xfail(strict=True, reason="H-API-04: el nombre del archivo no se normaliza")
-OVERWRITE_BUG = pytest.mark.xfail(strict=True, reason="H-API-15: una subida sobrescribe el archivo de otro usuario")
 
 
 def raw_token(fields: str) -> str:
@@ -353,20 +352,82 @@ def test_upload_one_mebibyte_file_reports_exact_size(client) -> None:
     assert response.json()["size"] == ONE_MEBIBYTE
 
 
-def test_upload_same_name_overwrites_previous_file(client, tmp_path) -> None:
+def test_upload_same_name_is_rejected_and_keeps_previous_file(client, tmp_path) -> None:
     client.post("/api/requirements", headers=auth_headers(), files={"file": ("a.txt", b"primero", "text/plain")})
-    client.post("/api/requirements", headers=auth_headers(), files={"file": ("a.txt", b"segundo!", "text/plain")})
-    assert (tmp_path / "uploads" / "a.txt").read_bytes() == b"segundo!"
+    response = client.post(
+        "/api/requirements", headers=auth_headers(), files={"file": ("a.txt", b"segundo!", "text/plain")}
+    )
+    assert response.status_code == 409
+    assert response.json() == {"detail": "File already exists"}
+    assert str(tmp_path) not in response.text
+    assert (tmp_path / "uploads" / "a.txt").read_bytes() == b"primero"
 
 
-@OVERWRITE_BUG
 def test_upload_does_not_overwrite_file_of_another_user(client, tmp_path) -> None:
     client.post("/api/requirements", headers=auth_headers("alice"), files={"file": ("req.txt", b"de alice", "text/plain")})
     response = client.post(
         "/api/requirements", headers=auth_headers("bob"), files={"file": ("req.txt", b"de bob", "text/plain")}
     )
+    assert response.status_code == 409
     assert (tmp_path / "uploads" / "req.txt").read_bytes() == b"de alice"
-    assert response.status_code != 201
+
+
+def test_upload_with_invalid_token_writes_no_file(client, tmp_path) -> None:
+    response = client.post("/api/requirements", files={"file": ("a.txt", b"x", "text/plain")})
+    assert response.status_code == 401
+    assert list((tmp_path / "uploads").iterdir()) == []
+
+
+def test_store_concurrent_same_name_lets_exactly_one_succeed(tmp_path) -> None:
+    from app.services import FileAlreadyExistsError, RequirementService
+
+    service = RequirementService(str(tmp_path / "uploads"))
+    attempts = 8
+    barrier = threading.Barrier(attempts)
+    outcomes: list[str] = []
+
+    def upload(index: int) -> None:
+        barrier.wait()
+        try:
+            service.store("mismo.txt", f"contenido-{index}".encode())
+            outcomes.append("stored")
+        except FileAlreadyExistsError:
+            outcomes.append("rejected")
+
+    threads = [threading.Thread(target=upload, args=(index,)) for index in range(attempts)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(outcomes) == ["rejected"] * (attempts - 1) + ["stored"]
+
+
+def test_store_failed_write_leaves_no_partial_file(tmp_path, monkeypatch) -> None:
+    from app.services import RequirementService
+
+    original_open = Path.open
+
+    class WriteFails:
+        def __init__(self, real_file) -> None:
+            self._real_file = real_file
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc) -> bool:
+            self._real_file.close()
+            return False
+
+        def write(self, _content) -> None:
+            raise OSError("disco lleno")
+
+    service = RequirementService(str(tmp_path / "uploads"))
+    monkeypatch.setattr(Path, "open", lambda self, *args, **kwargs: WriteFails(original_open(self, *args, **kwargs)))
+    with pytest.raises(OSError):
+        service.store("a.txt", b"x")
+    monkeypatch.undo()
+    assert not (tmp_path / "uploads" / "a.txt").exists()
+    assert service.store("a.txt", b"x").read_bytes() == b"x"
 
 
 def test_upload_without_file_field_returns_422(client) -> None:
