@@ -3,7 +3,7 @@
 ## 1. Characterize the login behavior
 
 - [x] 1.1 Run `mvn -Dtest=AuthResourceTest test` from `auth/` and confirm the existing workshop login returns HTTP `200`, `user.username` `student`, and a non-null token.
-- [ ] 1.2 Add endpoint tests for `' OR '1'='1` in the username and password fields; run `mvn -Dtest=AuthResourceTest test` before changing credential lookup and confirm both reproduce the issue by returning a token instead of the expected `401` without a token.
+- [x] 1.2 Add endpoint tests for `' OR '1'='1` in the username and password fields; run `mvn -Dtest=AuthResourceTest test` before changing credential lookup and confirm the password case reproduces the issue by returning a token instead of the expected `401`; record that the username case with an incorrect password already returns `401` and keep it as a regression test.
 
 ## 2. Correct credential lookup
 

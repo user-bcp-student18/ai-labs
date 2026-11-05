@@ -40,7 +40,7 @@ See [proposal.md](proposal.md) for the motivation and [specs/auth-login/spec.md]
 ## Incremental Strategy
 
 1. Run the existing auth test from `auth/` to establish the valid-login baseline before changing credential lookup.
-2. Add endpoint-level tests for the issue's injection-shaped value in `username` and `password`, asserting `401` and no token. Run them before changing the lookup to demonstrate the vulnerable behavior and retain them as regression tests.
+2. Add endpoint-level tests for the issue's injection-shaped value in `username` and `password`, asserting `401` and no token. Run them before changing the lookup: the `password` case demonstrates the vulnerable behavior, while the `username` case with an incorrect password already returns `401` under the current lookup (operator precedence in the concatenated query) and is retained as a regression test.
 3. Change only the JDBC credential lookup to bind both supplied values. Do not alter request validation, response construction, token generation, schema, or configuration.
 4. Run the complete auth test suite and JaCoCo verification from `auth/`; keep coverage of modified code at or above the repository's 85% target. Review that the API and response contract remain unchanged.
 
